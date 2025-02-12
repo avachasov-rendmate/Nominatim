@@ -24,11 +24,6 @@ clean:
 	rm -rf data/module*
 	rm -rf data/tiger*
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	sudo -u postgres psql -c "DROP DATABASE IF EXISTS nominatim;"
-	@echo "🧹 Cleaning Git repository..."
-	git reset --hard HEAD
-	git clean -fd
-	@echo "✨ Clean complete"
 
 # Create environment configuration
 .PHONY: create-env
