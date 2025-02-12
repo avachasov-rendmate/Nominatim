@@ -1,44 +1,158 @@
-all:
+# Configuration
+VENV := venv
+PYTHON_VERSION := $(shell python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+PYTHON := python$(PYTHON_VERSION)
+PIP := $(VENV)/bin/pip
+USER := $(shell whoami)
 
-# Building of wheels
+# Main build target
+.PHONY: all
+all: clean install-deps create-env setup-venv download-data build-nominatim
 
-build: clean-build build-db build-api
+# Clean everything
+.PHONY: clean
+clean:
+	@echo "🧹 Cleaning up..."
+	rm -rf $(VENV)
+	rm -rf dist/*
+	rm -rf build/*
+	rm -rf data/*
+	rm -f data/flatnode.file
+	rm -f data/import-style.lua
+	rm -f data/no_water.lua
+	rm -f data/*.osm.pbf
+	rm -rf data/module*
+	rm -rf data/tiger*
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	sudo -u postgres psql -c "DROP DATABASE IF EXISTS nominatim;"
+	@echo "🧹 Cleaning Git repository..."
+	git reset --hard HEAD
+	git clean -fd
+	@echo "✨ Clean complete"
 
-clean-build:
-	rm -f dist/*
+# Create environment configuration
+.PHONY: create-env
+create-env:
+	@echo "📝 Creating environment configuration..."
+	@mkdir -p data
+	@echo "Creating local environment file..."
+	@cp settings/env.defaults data/env
+	@sed -i 's/NOMINATIM_DATABASE_WEBUSER=.*/NOMINATIM_DATABASE_WEBUSER="postgres"/' data/env
+	@sed -i 's/NOMINATIM_IMPORT_STYLE=.*/NOMINATIM_IMPORT_STYLE="admin"/' data/env
+	@echo "✅ Configuration updated"
+	@echo "✨ Environment files created. Edit data/env for local settings."
 
-build-db:
-	python3 -m build packaging/nominatim-db --outdir dist/
+# Install system dependencies
+.PHONY: install-deps
+install-deps:
+	@echo "📦 Installing system dependencies..."
+	@echo "🐍 Detected Python version: $(PYTHON_VERSION)"
+	sudo apt-get update
+	sudo apt-get install -y \
+		build-essential cmake g++ \
+		libboost-dev libboost-system-dev \
+		libboost-filesystem-dev \
+		libexpat1-dev zlib1g-dev \
+		libbz2-dev libpq-dev libproj-dev \
+		pkg-config libicu-dev \
+		postgresql-server-dev-all \
+		python3-dev python3-venv \
+		acl git wget osm2pgsql
 
-build-api:
-	python3 -m build packaging/nominatim-api --outdir dist/
+# Setup Python virtual environment
+.PHONY: setup-venv
+setup-venv:
+	@echo "🐍 Setting up Python virtual environment..."
+	$(PYTHON) -m venv $(VENV)
+	$(PIP) install --upgrade pip
+	$(PIP) install \
+		build wheel hatchling \
+		psycopg2-binary PyICU \
+		python-dotenv pytidylib \
+		Jinja2 datrie pytest \
+		pytest-cov behave \
+		behave-html-formatter \
+		flake8 mypy types-psycopg2 \
+		types-PyYAML mkdocs \
+		mkdocs-material watchdog \
+		uvicorn fastapi falcon \
+		falcon-multipart
 
-# Tests
+# Download required data files
+.PHONY: download-data
+download-data:
+	@echo "📥 Downloading required data files..."
+	mkdir -p packaging/nominatim-db/data
+	wget -O packaging/nominatim-db/data/country_osm_grid.sql.gz \
+		https://nominatim.org/data/country_grid.sql.gz
+	wget -O packaging/nominatim-db/data/words.sql \
+		https://raw.githubusercontent.com/osm-search/Nominatim/master/data/words.sql
 
-tests: mypy lint pytest bdd
+# Build Nominatim
+.PHONY: build-nominatim
+build-nominatim:
+	@echo "🏗️ Building Nominatim..."
+	mkdir -p build/nominatim_db-5.0.0
+	mkdir -p build/nominatim_api-5.0.0
+	cp COPYING build/nominatim_db-5.0.0/
+	cp COPYING build/nominatim_api-5.0.0/
+	cd packaging/nominatim-db && \
+	PYTHONPATH=../../ \
+	PYTHONWARNINGS=ignore::DeprecationWarning \
+	../../$(VENV)/bin/python -m build \
+		--no-isolation \
+		--wheel \
+		--outdir ../../dist/
+	cd packaging/nominatim-api && \
+	PYTHONPATH=../../ \
+	../../$(VENV)/bin/python -m build \
+		--no-isolation \
+		--wheel \
+		--outdir ../../dist/
+	$(PIP) install --force-reinstall dist/nominatim_*.whl
 
-mypy:
-	mypy --strict --python-version 3.8 src
+# Import test data (Iceland - admin boundaries and places only)
+.PHONY: import-test-data
+import-test-data:
+	@echo "🗺️ Downloading and importing wales test data..."
+	mkdir -p data
+	cp settings/wales-latest.osm.pbf data/
+	$(VENV)/bin/nominatim import \
+		--osm-file data/wales-latest.osm.pbf \
+		--project-dir data
 
-pytest:
-	pytest test/python
+# Development mode with auto-reload
+.PHONY: dev
+dev:
+	@echo "🔄 Starting development server with auto-reload..."
+	$(VENV)/bin/nominatim serve --project-dir data --development
 
-lint:
-	flake8 src
+# Start server
+.PHONY: serve
+serve:
+	@echo "🚀 Starting Nominatim server..."
+	$(VENV)/bin/nominatim serve --project-dir data
 
-bdd:
-	cd test/bdd; behave -DREMOVE_TEMPLATE=1
+# Show system info
+.PHONY: info
+info:
+	@echo "System Information:"
+	@echo "  Python Version: $(PYTHON_VERSION)"
+	@echo "  Operating System: $(shell lsb_release -ds)"
+	-@psql -d nominatim -c "\dx" 2>/dev/null
 
-# Documentation
+# Help target
+.PHONY: help
+help:
+	@echo "Available commands:"
+	@echo "  make          - Clean install and build everything"
+	@echo "  make clean    - Remove all built and temporary files"
+	@echo "  make create-env - Create environment configuration files"
+	@echo "  make serve    - Start Nominatim server"
+	@echo "  make dev      - Start development server with auto-reload"
+	@echo "  make import-test-data - Import Iceland test data"
+	@echo "  make info     - Show system information"
+	@echo "  make help     - Show this help message"
 
-doc:
-	mkdocs build
-
-serve-doc:
-	mkdocs serve
-
-manpage:
-	argparse-manpage --pyfile man/create-manpage.py --function get_parser --project-name Nominatim --url https://nominatim.org  > man/nominatim.1 --author 'the Nominatim developer community' --author-email info@nominatim.org
-
-
-.PHONY: tests mypy pytest lint bdd build clean-build build-db build-api doc serve-doc manpage
+# Default target
+.DEFAULT_GOAL := all

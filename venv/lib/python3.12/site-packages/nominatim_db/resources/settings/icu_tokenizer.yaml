@@ -1,0 +1,215 @@
+query-preprocessing:
+    - step: split_japanese_phrases
+    - step: normalize
+normalization:
+    - ":: lower ()"
+    - ":: Hans-Hant"
+    - !include icu-rules/unicode-digits-to-decimal.yaml
+    - "'№' > 'no'"
+    - "'n°' > 'no'"
+    - "'nº' > 'no'"
+    - "ª > a"
+    - "º > o"
+    - "[[:Punctuation:][:Symbol:][\u02bc] - [-:]]+  > '-'"
+    - "ß > 'ss'" # German szet is unambiguously equal to double ss
+    - "[^[:alnum:] [:Canonical_Combining_Class=Virama:] [:Space:] [-:]] >"
+    - "[:Lm:] >"
+    - ":: [[:Number:]] Latin ()"
+    - ":: [[:Number:]] Ascii ();"
+    - ":: [[:Number:]] NFD ();"
+    - "[[:Nonspacing Mark:] [:Cf:]] >;"
+    - "[-:]?[:Space:]+[-:]? > ' '"
+transliteration:
+    - "[-:]  > ' '"
+    - ":: Latin ()"
+    - !include icu-rules/extended-unicode-to-asccii.yaml
+    - ":: Ascii ()"
+    - ":: NFD ()"
+    - ":: lower ()"
+    - "[^a-z0-9[:Space:]] >"
+    - ":: NFC ()"
+    - "[:Space:]+ > ' '"
+sanitizers:
+    - step: clean-housenumbers
+      filter-kind:
+        - housenumber
+        - conscriptionnumber
+        - streetnumber
+      convert-to-name:
+        - (\A|.*,)[^\d,]{3,}(,.*|\Z)
+    - step: clean-postcodes
+      convert-to-address: yes
+      default-pattern: "[A-Z0-9- ]{3,12}"
+    - step: clean-tiger-tags
+    - step: split-name-list
+      delimiters: ;
+    - step: strip-brace-terms
+    - step: tag-analyzer-by-language
+      filter-kind: [".*name.*"]
+      whitelist: [bg,ca,cs,da,de,el,en,es,et,eu,fi,fr,gl,hu,it,ja,mg,ms,nl,no,pl,pt,ro,ru,sk,sl,sv,tr,uk,vi]
+      use-defaults: all
+      mode: append
+    - step: tag-japanese
+token-analysis:
+    - analyzer: generic
+    - id: "@housenumber"
+      analyzer: housenumbers
+    - id: "@postcode"
+      analyzer: postcodes
+    - id: bg
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-bg.yaml
+    - id: ca
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-ca.yaml
+    - id: cs
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-cs.yaml
+    - id: da
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-da.yaml
+    - id: de
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-de.yaml
+      mutations:
+          - pattern: ä
+            replacements: ["ä", "ae"]
+          - pattern: ö
+            replacements: ["ö", "oe"]
+          - pattern: ü
+            replacements: ["ü", "ue"]
+    - id: el
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-el.yaml
+    - id: en
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-en.yaml
+    - id: es
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-es.yaml
+    - id: et
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-et.yaml
+    - id: eu
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-eu.yaml
+    - id: fi
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-fi.yaml
+    - id: fr
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-fr.yaml
+    - id: gl
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-gl.yaml
+    - id: hu
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-hu.yaml
+    - id: it
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-it.yaml
+    - id: ja
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-ja.yaml
+    - id: mg
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-mg.yaml
+    - id: ms
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-ms.yaml
+    - id: nl
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-nl.yaml
+    - id: no
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-no.yaml
+    - id: pl
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-pl.yaml
+    - id: pt
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-pt.yaml
+    - id: ro
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-ro.yaml
+    - id: ru
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-ru.yaml
+    - id: sk
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-sk.yaml
+    - id: sl
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-sl.yaml
+    - id: sv
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-sv.yaml
+    - id: tr
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-tr.yaml
+    - id: uk
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-uk.yaml
+    - id: vi
+      analyzer: generic
+      mode: variant-only
+      variants:
+          - !include icu-rules/variants-vi.yaml

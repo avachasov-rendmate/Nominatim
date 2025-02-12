@@ -1,0 +1,5 @@
+#!/home/vachick/PhpstormProjects/Nominatim/venv/bin/python3.12
+
+from nominatim_db import cli
+
+exit(cli.nominatim(osm2pgsql_path=None))

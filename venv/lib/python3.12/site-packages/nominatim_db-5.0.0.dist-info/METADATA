@@ -1,0 +1,79 @@
+Metadata-Version: 2.4
+Name: nominatim-db
+Version: 5.0.0
+Summary: A tool for building a database of OpenStreetMap for geocoding and for searching the database. Database backend.
+Project-URL: Homepage, https://nominatim.org
+Project-URL: Documentation, https://nominatim.org/release-docs/latest/
+Project-URL: Issues, https://github.com/osm-search/Nominatim/issues
+Project-URL: Repository, https://github.com/osm-search/Nominatim
+Maintainer-email: Sarah Hoffmann <lonvia@denofr.de>, Marc Tobias <mtmail-cpan@gmx.net>
+License-Expression: GPL-3.0-or-later
+License-File: COPYING
+Keywords: OpenStreetMap,geocoding,search
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.7
+Requires-Dist: datrie
+Requires-Dist: jinja2
+Requires-Dist: psutil
+Requires-Dist: psycopg
+Requires-Dist: pyicu
+Requires-Dist: python-dotenv
+Requires-Dist: pyyaml>=5.1
+Description-Content-Type: text/markdown
+
+# Nominatim - DB Backend
+
+Nominatim is a tool to search OpenStreetMap data
+by name and address (geocoding) and to generate synthetic addresses of
+OSM points (reverse geocoding).
+
+This module implements the database backend for Nominatim and the
+command-line tool for importing and maintaining the database.
+
+## Installation
+
+### Prerequisites
+
+Nominatim requires [osm2pgsql](https://osm2pgsql.org/) (>=1.8) for reading
+OSM data and [PostgreSQL](https://www.postgresql.org/) (>=9.6) to store the data.
+
+On Ubuntu (>=23.04) and Debian (when using backports), you can install them with:
+
+    sudo apt-get install osm2pgsql postgresql-postgis
+
+### Installation from pypi
+
+To install Nominatim from pypi, run:
+
+    pip install nominatim-db
+
+
+## Quick start
+
+First create a project directory for your new Nominatim database, which
+is the space for additional configuration and customization:
+
+    mkdir nominatim-project
+
+Make sure you run all nominatim commands from within the project directory:
+
+    cd nominatim-project
+
+Download an appropriate data extract, for example from
+[Geofabrik](https://download.geofabrik.de/) and import the file:
+
+    nominatim import --osm-file <downlaoded-osm-data.pbf>
+
+You will need to install the [`nominatim-api`](https://pypi.org/project/nominatim-api/)
+package to query the database.
+
+## Documentation
+
+A HTML version of the documentation can be found at
+https://nominatim.org/release-docs/latest/ .
+
+## License
+
+The source code is available under a GPLv3 license.
