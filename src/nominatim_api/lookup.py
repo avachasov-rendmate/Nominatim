@@ -187,20 +187,24 @@ async def get_places(conn: SearchConnection, places: Iterable[ntyp.PlaceRef],
 
 
 async def find_in_placex(conn: SearchConnection, collector: Collector) -> bool:
-    """ Search for the given places in the main placex table.
-    """
+    """ Search for the given places in the main placex table. """
     log().section("Find in placex table")
     t = conn.t.placex
-    sql = sa.select(t.c.place_id, t.c.osm_type, t.c.osm_id, t.c.name,
-                    t.c.class_, t.c.type, t.c.admin_level,
-                    t.c.address, t.c.extratags,
-                    t.c.housenumber, t.c.postcode, t.c.country_code,
-                    t.c.importance, t.c.wikipedia, t.c.indexed_date,
-                    t.c.parent_place_id, t.c.rank_address, t.c.rank_search,
-                    t.c.linked_place_id,
-                    t.c.geometry.ST_Expand(0).label('bbox'),
-                    t.c.centroid)
+    
+    sql = sa.select(
+        t.c.place_id, t.c.osm_type, t.c.osm_id, t.c.name,
+        t.c.class_, t.c.type, t.c.admin_level,
+        t.c.address, t.c.extratags,
+        t.c.housenumber, t.c.postcode, t.c.country_code,
+        t.c.importance, t.c.wikipedia, t.c.indexed_date,
+        t.c.parent_place_id, t.c.rank_address, t.c.rank_search,
+        t.c.linked_place_id,
+        t.c.geometry,  # Original geometry from database
+        t.c.geometry.ST_Expand(0).label('bbox'),
+        t.c.centroid
+    )
 
+    # Search by OSM IDs
     for osm_type in ('N', 'W', 'R'):
         osm_ids = [{'i': i, 'oi': p.osm_id, 'oc': p.osm_class or ''}
                    for i, p in collector.enumerate_free_osm_ids()
@@ -220,6 +224,7 @@ async def find_in_placex(conn: SearchConnection, collector: Collector) -> bool:
                                                  nres.create_from_placex_row):
                 return True
 
+    # Search by Place IDs
     place_ids = [{'i': i, 'id': p.place_id}
                  for i, p in collector.enumerate_free_place_ids()]
 
