@@ -5,6 +5,15 @@ PYTHON := python$(PYTHON_VERSION)
 PIP := $(VENV)/bin/pip
 USER := $(shell whoami)
 
+# SSH tunnel configuration
+SSH_USER := ubuntu
+SSH_HOST := 168.119.194.135
+SSH_PORT := 2203
+DB_CONTAINER_IP := 172.17.0.2
+LOCAL_PORT := 5433
+REMOTE_PORT := 5432
+SSH_KEY_PATH := $(HOME)/.ssh/mix-maptiler-ssh
+
 # Main build target
 .PHONY: all
 all: clean install-deps create-env setup-venv download-data build-nominatim
@@ -110,27 +119,21 @@ import-test-data:
 		--osm-file data/wales-latest.osm.pbf \
 		--project-dir data
 
-# Development mode with auto-reload
+# Development mode with build and live reload
 .PHONY: dev
-dev:
+dev: build-nominatim
 	@echo "🔄 Starting development server with auto-reload..."
-	$(VENV)/bin/nominatim serve --project-dir data --development
+	$(VENV)/bin/watchmedo auto-restart \
+		--directory=./ \
+		--pattern="*.py;*.sql" \
+		--recursive \
+		-- $(VENV)/bin/nominatim serve --project-dir data
 
 # Start server
 .PHONY: serve
 serve:
 	@echo "🚀 Starting Nominatim server..."
-	@mkdir -p logs
-	nohup $(VENV)/bin/nominatim serve --project-dir data > logs/nominatim.log 2>&1 &
-	@echo "Server started in background. Check logs/nominatim.log for output."
-	@echo "To stop the server, use: make stop"
-
-# Stop server
-.PHONY: stop
-stop:
-	@echo "🛑 Stopping Nominatim server..."
-	-pkill -f "nominatim serve"
-	@echo "Server stopped."
+	$(VENV)/bin/nominatim serve --project-dir data
 
 # Show system info
 .PHONY: info
@@ -140,6 +143,39 @@ info:
 	@echo "  Operating System: $(shell lsb_release -ds)"
 	-@psql -d nominatim -c "\dx" 2>/dev/null
 
+# Open SSH tunnel
+.PHONY: tunnel-open
+tunnel-open:
+	@echo "🔗 Opening SSH tunnel..."
+	@echo "⌨️  Please enter your SSH key password when prompted..."
+	@mkdir -p logs
+	@ssh -p $(SSH_PORT) -i $(SSH_KEY_PATH) -N -L $(LOCAL_PORT):$(DB_CONTAINER_IP):$(REMOTE_PORT) $(SSH_USER)@$(SSH_HOST) > logs/tunnel.log 2>&1 &
+	@sleep 5
+	@if netstat -tln | grep -q ":$(LOCAL_PORT)"; then \
+		echo "✅ Tunnel started successfully. Local port $(LOCAL_PORT) -> $(DB_CONTAINER_IP):$(REMOTE_PORT)"; \
+	else \
+		echo "❌ Failed to establish tunnel. Check logs/tunnel.log for details."; \
+		exit 1; \
+	fi
+
+# Close SSH tunnel
+.PHONY: tunnel-close
+tunnel-close:
+	@echo "🔌 Closing SSH tunnel..."
+	-pkill -f "ssh.*$(LOCAL_PORT):$(DB_CONTAINER_IP):$(REMOTE_PORT)" || true
+	@echo "Tunnel closed (if it was running)."
+
+# Check tunnel status
+.PHONY: tunnel-status
+tunnel-status:
+	@echo "📊 Checking tunnel status..."
+	@if pgrep -f "ssh.*$(LOCAL_PORT):$(DB_CONTAINER_IP):$(REMOTE_PORT)"; then \
+		echo "Tunnel is active"; \
+		echo "Process: $$(ps aux | grep "ssh.*$(LOCAL_PORT):$(DB_CONTAINER_IP):$(REMOTE_PORT)" | grep -v grep)"; \
+	else \
+		echo "No active tunnel"; \
+	fi
+
 # Help target
 .PHONY: help
 help:
@@ -148,9 +184,12 @@ help:
 	@echo "  make clean    - Remove all built and temporary files"
 	@echo "  make create-env - Create environment configuration files"
 	@echo "  make serve    - Start Nominatim server"
-	@echo "  make dev      - Start development server with auto-reload"
+	@echo "  make dev      - Start development server with live reload"
 	@echo "  make import-test-data - Import Iceland test data"
 	@echo "  make info     - Show system information"
+	@echo "  make tunnel-open  - Open SSH tunnel to database"
+	@echo "  make tunnel-close - Close SSH tunnel to database"
+	@echo "  make tunnel-status - Check SSH tunnel status"
 	@echo "  make help     - Show this help message"
 	@echo "  make stop     - Stop the running Nominatim server"
 
