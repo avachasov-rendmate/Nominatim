@@ -120,7 +120,17 @@ dev:
 .PHONY: serve
 serve:
 	@echo "🚀 Starting Nominatim server..."
-	$(VENV)/bin/nominatim serve --project-dir data
+	@mkdir -p logs
+	nohup $(VENV)/bin/nominatim serve --project-dir data > logs/nominatim.log 2>&1 &
+	@echo "Server started in background. Check logs/nominatim.log for output."
+	@echo "To stop the server, use: make stop"
+
+# Stop server
+.PHONY: stop
+stop:
+	@echo "🛑 Stopping Nominatim server..."
+	-pkill -f "nominatim serve"
+	@echo "Server stopped."
 
 # Show system info
 .PHONY: info
@@ -142,6 +152,7 @@ help:
 	@echo "  make import-test-data - Import Iceland test data"
 	@echo "  make info     - Show system information"
 	@echo "  make help     - Show this help message"
+	@echo "  make stop     - Stop the running Nominatim server"
 
 # Default target
 .DEFAULT_GOAL := all
