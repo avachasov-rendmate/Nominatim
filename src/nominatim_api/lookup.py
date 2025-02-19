@@ -190,7 +190,7 @@ async def find_in_placex(conn: SearchConnection, collector: Collector) -> bool:
     """ Search for the given places in the main placex table. """
     log().section("Find in placex table")
     t = conn.t.placex
-    
+    print('FUCKING SHIT 22')
     sql = sa.select(
         t.c.place_id, t.c.osm_type, t.c.osm_id, t.c.name,
         t.c.class_, t.c.type, t.c.admin_level,
@@ -199,7 +199,15 @@ async def find_in_placex(conn: SearchConnection, collector: Collector) -> bool:
         t.c.importance, t.c.wikipedia, t.c.indexed_date,
         t.c.parent_place_id, t.c.rank_address, t.c.rank_search,
         t.c.linked_place_id,
-        t.c.geometry,  # Original geometry from database
+        sa.text("""
+            ST_Intersection(
+                placex.geometry,
+                (SELECT ST_Union(geometry) 
+                 FROM placex 
+                 WHERE class = 'natural' 
+                 AND type = 'coastline')
+            )
+        """).cast(sa.String).label('geometry'),
         t.c.geometry.ST_Expand(0).label('bbox'),
         t.c.centroid
     )

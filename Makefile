@@ -119,15 +119,21 @@ import-test-data:
 		--osm-file data/wales-latest.osm.pbf \
 		--project-dir data
 
-# Development mode with build and live reload
+# Development mode with live reload
 .PHONY: dev
 dev: build-nominatim
 	@echo "🔄 Starting development server with auto-reload..."
-	$(VENV)/bin/watchmedo auto-restart \
-		--directory=./ \
-		--pattern="*.py;*.sql" \
-		--recursive \
-		-- $(VENV)/bin/nominatim serve --project-dir data
+	$(PIP) install -e packaging/nominatim-api
+	$(PIP) install -e packaging/nominatim-db
+	$(PIP) install uvicorn watchfiles
+	PYTHONPATH=src $(VENV)/bin/uvicorn \
+		"nominatim_api.server.starlette.server:run_wsgi" \
+		--host 127.0.0.1 \
+		--port 8088 \
+		--reload \
+		--reload-dir src \
+		--log-level debug \
+		--factory
 
 # Start server
 .PHONY: serve
